@@ -70,7 +70,7 @@ impl BlockDevice for LinuxBlockDevice {
         Ok(())
     }
 
-    fn num_blocks(&self) -> Result<BlockCount, Self::Error> {
+    async fn num_blocks(&self) -> Result<BlockCount, Self::Error> {
         let num_blocks = self.file.lock().unwrap().metadata().unwrap().len() / 512;
         Ok(BlockCount(num_blocks as u32))
     }

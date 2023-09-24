@@ -49,7 +49,7 @@ pub trait BlockDevice {
     /// Write one or more blocks, starting at the given block index.
     async fn write(&self, blocks: &[Block], start_block_idx: BlockIdx) -> Result<(), Self::Error>;
     /// Determine how many blocks this device can hold.
-    fn num_blocks(&self) -> Result<BlockCount, Self::Error>;
+    async fn num_blocks(&self) -> Result<BlockCount, Self::Error>;
 }
 
 impl Block {

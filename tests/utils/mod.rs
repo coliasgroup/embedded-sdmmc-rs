@@ -123,7 +123,7 @@ where
         Ok(())
     }
 
-    fn num_blocks(&self) -> Result<BlockCount, Self::Error> {
+    async fn num_blocks(&self) -> Result<BlockCount, Self::Error> {
         let borrow = self.contents.borrow();
         let contents: &[u8] = borrow.as_ref();
         let len_blocks = contents.len() as usize / embedded_sdmmc::Block::LEN;
