@@ -16,61 +16,6 @@
 //! couldn't work with a USB Thumb Drive, but we only supply a `BlockDevice`
 //! suitable for reading SD and SDHC cards over SPI.
 //!
-//! ```rust,no_run
-//! # struct DummySpi;
-//! # struct DummyCsPin;
-//! # struct DummyUart;
-//! # struct DummyTimeSource;
-//! # struct DummyDelayer;
-//! # impl embedded_hal::blocking::spi::Transfer<u8> for  DummySpi {
-//! #   type Error = ();
-//! #   fn transfer<'w>(&mut self, data: &'w mut [u8]) -> Result<&'w [u8], Self::Error> { Ok(&[0]) }
-//! # }
-//! # impl embedded_hal::blocking::spi::Write<u8> for  DummySpi {
-//! #   type Error = ();
-//! #   fn write(&mut self, data: &[u8]) -> Result<(), Self::Error> { Ok(()) }
-//! # }
-//! # impl embedded_hal::digital::v2::OutputPin for DummyCsPin {
-//! #   type Error = ();
-//! #   fn set_low(&mut self) -> Result<(), ()> { Ok(()) }
-//! #   fn set_high(&mut self) -> Result<(), ()> { Ok(()) }
-//! # }
-//! # impl embedded_sdmmc::TimeSource for DummyTimeSource {
-//! #   fn get_timestamp(&self) -> embedded_sdmmc::Timestamp { embedded_sdmmc::Timestamp::from_fat(0, 0) }
-//! # }
-//! # impl embedded_hal::blocking::delay::DelayUs<u8> for DummyDelayer {
-//! #   fn delay_us(&mut self, us: u8) {}
-//! # }
-//! # impl std::fmt::Write for DummyUart { fn write_str(&mut self, s: &str) -> std::fmt::Result { Ok(()) } }
-//! # use std::fmt::Write;
-//! # use embedded_sdmmc::VolumeManager;
-//! # fn main() -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
-//! # let mut sdmmc_spi = DummySpi;
-//! # let mut sdmmc_cs = DummyCsPin;
-//! # let time_source = DummyTimeSource;
-//! # let delayer = DummyDelayer;
-//! let sdcard = embedded_sdmmc::SdCard::new(sdmmc_spi, sdmmc_cs, delayer);
-//! println!("Card size {} bytes", sdcard.num_bytes()?);
-//! let mut volume_mgr = VolumeManager::new(sdcard, time_source);
-//! println!("Card size is still {} bytes", volume_mgr.device().num_bytes()?);
-//! let volume0 = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0))?;
-//! println!("Volume 0: {:?}", volume0);
-//! let root_dir = volume_mgr.open_root_dir(volume0)?;
-//! let my_file = volume_mgr.open_file_in_dir(
-//!     root_dir, "MY_FILE.TXT", embedded_sdmmc::Mode::ReadOnly)?;
-//! while !volume_mgr.file_eof(my_file).unwrap() {
-//!     let mut buffer = [0u8; 32];
-//!     let num_read = volume_mgr.read(my_file, &mut buffer)?;
-//!     for b in &buffer[0..num_read] {
-//!         print!("{}", *b as char);
-//!     }
-//! }
-//! volume_mgr.close_file(my_file)?;
-//! volume_mgr.close_dir(root_dir)?;
-//! # Ok(())
-//! # }
-//! ```
-//!
 //! ## Features
 //!
 //! * `log`: Enabled by default. Generates log messages using the `log` crate.
@@ -99,7 +44,6 @@ mod structure;
 pub mod blockdevice;
 pub mod fat;
 pub mod filesystem;
-pub mod sdcard;
 
 use filesystem::SearchId;
 
@@ -116,12 +60,6 @@ pub use crate::filesystem::{
 };
 
 use filesystem::DirectoryInfo;
-
-#[doc(inline)]
-pub use crate::sdcard::Error as SdCardError;
-
-#[doc(inline)]
-pub use crate::sdcard::SdCard;
 
 mod volume_mgr;
 #[doc(inline)]
