@@ -1,3 +1,5 @@
+#![feature(async_fn_in_trait)]
+
 //! Reading related tests
 
 mod utils;
@@ -5,24 +7,27 @@ mod utils;
 static TEST_DAT_SHA256_SUM: &str =
     "59e3468e3bef8bfe37e60a8221a1896e105b80a61a23637612ac8cd24ca04a75";
 
-#[test]
-fn read_file_512_blocks() {
+#[tokio::test]
+async fn read_file_512_blocks() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
     let root_dir = volume_mgr
         .open_root_dir(fat16_volume)
         .expect("open root dir");
     let test_dir = volume_mgr
         .open_dir(root_dir, "TEST")
+        .await
         .expect("Open test dir");
 
     let test_file = volume_mgr
         .open_file_in_dir(test_dir, "TEST.DAT", embedded_sdmmc::Mode::ReadOnly)
+        .await
         .expect("open test file");
 
     let mut contents = Vec::new();
@@ -30,7 +35,10 @@ fn read_file_512_blocks() {
     let mut partial = false;
     while !volume_mgr.file_eof(test_file).expect("check eof") {
         let mut buffer = [0u8; 512];
-        let len = volume_mgr.read(test_file, &mut buffer).expect("read data");
+        let len = volume_mgr
+            .read(test_file, &mut buffer)
+            .await
+            .expect("read data");
         if len != buffer.len() {
             if partial {
                 panic!("Two partial reads!");
@@ -45,29 +53,33 @@ fn read_file_512_blocks() {
     assert_eq!(&hash, TEST_DAT_SHA256_SUM);
 }
 
-#[test]
-fn read_file_all() {
+#[tokio::test]
+async fn read_file_all() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
     let root_dir = volume_mgr
         .open_root_dir(fat16_volume)
         .expect("open root dir");
     let test_dir = volume_mgr
         .open_dir(root_dir, "TEST")
+        .await
         .expect("Open test dir");
 
     let test_file = volume_mgr
         .open_file_in_dir(test_dir, "TEST.DAT", embedded_sdmmc::Mode::ReadOnly)
+        .await
         .expect("open test file");
 
     let mut contents = vec![0u8; 4096];
     let len = volume_mgr
         .read(test_file, &mut contents)
+        .await
         .expect("read data");
     if len != 3500 {
         panic!("Failed to read all of TEST.DAT");
@@ -77,24 +89,27 @@ fn read_file_all() {
     assert_eq!(&hash, TEST_DAT_SHA256_SUM);
 }
 
-#[test]
-fn read_file_prime_blocks() {
+#[tokio::test]
+async fn read_file_prime_blocks() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
     let root_dir = volume_mgr
         .open_root_dir(fat16_volume)
         .expect("open root dir");
     let test_dir = volume_mgr
         .open_dir(root_dir, "TEST")
+        .await
         .expect("Open test dir");
 
     let test_file = volume_mgr
         .open_file_in_dir(test_dir, "TEST.DAT", embedded_sdmmc::Mode::ReadOnly)
+        .await
         .expect("open test file");
 
     let mut contents = Vec::new();
@@ -103,7 +118,10 @@ fn read_file_prime_blocks() {
     while !volume_mgr.file_eof(test_file).expect("check eof") {
         // Exercise the alignment code by reading in chunks of 53 bytes
         let mut buffer = [0u8; 53];
-        let len = volume_mgr.read(test_file, &mut buffer).expect("read data");
+        let len = volume_mgr
+            .read(test_file, &mut buffer)
+            .await
+            .expect("read data");
         if len != buffer.len() {
             if partial {
                 panic!("Two partial reads!");
@@ -118,24 +136,27 @@ fn read_file_prime_blocks() {
     assert_eq!(&hash, TEST_DAT_SHA256_SUM);
 }
 
-#[test]
-fn read_file_backwards() {
+#[tokio::test]
+async fn read_file_backwards() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
     let root_dir = volume_mgr
         .open_root_dir(fat16_volume)
         .expect("open root dir");
     let test_dir = volume_mgr
         .open_dir(root_dir, "TEST")
+        .await
         .expect("Open test dir");
 
     let test_file = volume_mgr
         .open_file_in_dir(test_dir, "TEST.DAT", embedded_sdmmc::Mode::ReadOnly)
+        .await
         .expect("open test file");
 
     let mut contents = std::collections::VecDeque::new();
@@ -152,7 +173,7 @@ fn read_file_backwards() {
             .file_seek_from_start(test_file, offset)
             .expect("seek");
         let mut buffer = [0u8; CHUNK_SIZE as usize];
-        let len = volume_mgr.read(test_file, &mut buffer).expect("read");
+        let len = volume_mgr.read(test_file, &mut buffer).await.expect("read");
         assert_eq!(len, CHUNK_SIZE as usize);
         contents.push_front(buffer.to_vec());
         read += CHUNK_SIZE;

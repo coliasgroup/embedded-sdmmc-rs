@@ -1,3 +1,5 @@
+#![feature(async_fn_in_trait)]
+
 //! Recursive Directory Listing Example.
 //!
 //! ```bash
@@ -41,7 +43,8 @@ use embedded_sdmmc::{Directory, VolumeIdx, VolumeManager};
 
 type Error = embedded_sdmmc::Error<std::io::Error>;
 
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     env_logger::init();
     let mut args = std::env::args().skip(1);
     let filename = args.next().unwrap_or_else(|| "/dev/mmcblk0".into());
@@ -49,9 +52,9 @@ fn main() -> Result<(), Error> {
     let lbd = LinuxBlockDevice::new(filename, print_blocks).map_err(Error::DeviceError)?;
     let mut volume_mgr: VolumeManager<LinuxBlockDevice, Clock, 8, 8, 4> =
         VolumeManager::new_with_limits(lbd, Clock, 0xAA00_0000);
-    let volume = volume_mgr.open_volume(VolumeIdx(0))?;
+    let volume = volume_mgr.open_volume(VolumeIdx(0)).await?;
     let root_dir = volume_mgr.open_root_dir(volume)?;
-    list_dir(&mut volume_mgr, root_dir, "/")?;
+    list_dir(&mut volume_mgr, root_dir, "/").await?;
     volume_mgr.close_dir(root_dir)?;
     Ok(())
 }
@@ -59,41 +62,44 @@ fn main() -> Result<(), Error> {
 /// Recursively print a directory listing for the open directory given.
 ///
 /// The path is for display purposes only.
-fn list_dir(
+#[async_recursion::async_recursion]
+async fn list_dir(
     volume_mgr: &mut VolumeManager<LinuxBlockDevice, Clock, 8, 8, 4>,
     directory: Directory,
     path: &str,
 ) -> Result<(), Error> {
     println!("Listing {}", path);
     let mut children = Vec::new();
-    volume_mgr.iterate_dir(directory, |entry| {
-        println!(
-            "{:12} {:9} {} {}",
-            entry.name,
-            entry.size,
-            entry.mtime,
+    volume_mgr
+        .iterate_dir(directory, |entry| {
+            println!(
+                "{:12} {:9} {} {}",
+                entry.name,
+                entry.size,
+                entry.mtime,
+                if entry.attributes.is_directory() {
+                    "<DIR>"
+                } else {
+                    ""
+                }
+            );
             if entry.attributes.is_directory() {
-                "<DIR>"
-            } else {
-                ""
+                if entry.name != embedded_sdmmc::ShortFileName::parent_dir()
+                    && entry.name != embedded_sdmmc::ShortFileName::this_dir()
+                {
+                    children.push(entry.name.clone());
+                }
             }
-        );
-        if entry.attributes.is_directory() {
-            if entry.name != embedded_sdmmc::ShortFileName::parent_dir()
-                && entry.name != embedded_sdmmc::ShortFileName::this_dir()
-            {
-                children.push(entry.name.clone());
-            }
-        }
-    })?;
+        })
+        .await?;
     for child_name in children {
-        let child_dir = volume_mgr.open_dir(directory, &child_name)?;
+        let child_dir = volume_mgr.open_dir(directory, &child_name).await?;
         let child_path = if path == "/" {
             format!("/{}", child_name)
         } else {
             format!("{}/{}", path, child_name)
         };
-        list_dir(volume_mgr, child_dir, &child_path)?;
+        list_dir(volume_mgr, child_dir, &child_path).await?;
         volume_mgr.close_dir(child_dir)?;
     }
     Ok(())

@@ -1,3 +1,5 @@
+#![feature(async_fn_in_trait)]
+
 //! Directory related tests
 
 use embedded_sdmmc::ShortFileName;
@@ -34,14 +36,15 @@ impl PartialEq<embedded_sdmmc::DirEntry> for ExpectedDirEntry {
     }
 }
 
-#[test]
-fn fat16_root_directory_listing() {
+#[tokio::test]
+async fn fat16_root_directory_listing() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
     let root_dir = volume_mgr
         .open_root_dir(fat16_volume)
@@ -84,6 +87,7 @@ fn fat16_root_directory_listing() {
         .iterate_dir(root_dir, |d| {
             listing.push(d.clone());
         })
+        .await
         .expect("iterate directory");
 
     assert_eq!(expected.len(), listing.len());
@@ -96,20 +100,22 @@ fn fat16_root_directory_listing() {
     }
 }
 
-#[test]
-fn fat16_sub_directory_listing() {
+#[tokio::test]
+async fn fat16_sub_directory_listing() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
     let root_dir = volume_mgr
         .open_root_dir(fat16_volume)
         .expect("open root dir");
     let test_dir = volume_mgr
         .open_dir(root_dir, "TEST")
+        .await
         .expect("open test dir");
 
     let expected = [
@@ -149,6 +155,7 @@ fn fat16_sub_directory_listing() {
             count += 1;
             listing.push(d.clone());
         })
+        .await
         .expect("iterate directory");
 
     assert_eq!(expected.len(), listing.len());
@@ -161,14 +168,15 @@ fn fat16_sub_directory_listing() {
     }
 }
 
-#[test]
-fn fat32_root_directory_listing() {
+#[tokio::test]
+async fn fat32_root_directory_listing() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat32_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(1))
+        .await
         .expect("open volume 1");
     let root_dir = volume_mgr
         .open_root_dir(fat32_volume)
@@ -211,6 +219,7 @@ fn fat32_root_directory_listing() {
         .iterate_dir(root_dir, |d| {
             listing.push(d.clone());
         })
+        .await
         .expect("iterate directory");
 
     assert_eq!(expected.len(), listing.len());
@@ -223,14 +232,15 @@ fn fat32_root_directory_listing() {
     }
 }
 
-#[test]
-fn open_dir_twice() {
+#[tokio::test]
+async fn open_dir_twice() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat32_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(1))
+        .await
         .expect("open volume 1");
 
     let root_dir = volume_mgr
@@ -242,16 +252,17 @@ fn open_dir_twice() {
         panic!("Expected to fail opening the root dir twice: {r:?}");
     };
 
-    let r = volume_mgr.open_dir(root_dir, "README.TXT");
+    let r = volume_mgr.open_dir(root_dir, "README.TXT").await;
     let Err(embedded_sdmmc::Error::OpenedFileAsDir) = r else {
         panic!("Expected to fail opening file as dir: {r:?}");
     };
 
     let test_dir = volume_mgr
         .open_dir(root_dir, "TEST")
+        .await
         .expect("open test dir");
 
-    let r = volume_mgr.open_dir(root_dir, "TEST");
+    let r = volume_mgr.open_dir(root_dir, "TEST").await;
     let Err(embedded_sdmmc::Error::DirAlreadyOpen) = r else {
         panic!("Expected to fail opening the dir twice: {r:?}");
     };
@@ -265,8 +276,8 @@ fn open_dir_twice() {
     };
 }
 
-#[test]
-fn open_too_many_dirs() {
+#[tokio::test]
+async fn open_too_many_dirs() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr: embedded_sdmmc::VolumeManager<
@@ -279,24 +290,27 @@ fn open_too_many_dirs() {
 
     let fat32_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(1))
+        .await
         .expect("open volume 1");
     let root_dir = volume_mgr
         .open_root_dir(fat32_volume)
         .expect("open root dir");
 
-    let Err(embedded_sdmmc::Error::TooManyOpenDirs) = volume_mgr.open_dir(root_dir, "TEST") else {
+    let Err(embedded_sdmmc::Error::TooManyOpenDirs) = volume_mgr.open_dir(root_dir, "TEST").await
+    else {
         panic!("Expected to fail at opening too many dirs");
     };
 }
 
-#[test]
-fn find_dir_entry() {
+#[tokio::test]
+async fn find_dir_entry() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let fat32_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(1))
+        .await
         .expect("open volume 1");
 
     let root_dir = volume_mgr
@@ -305,6 +319,7 @@ fn find_dir_entry() {
 
     let dir_entry = volume_mgr
         .find_directory_entry(root_dir, "README.TXT")
+        .await
         .expect("Find directory entry");
     assert!(dir_entry.attributes.is_archive());
     assert!(!dir_entry.attributes.is_directory());
@@ -313,7 +328,9 @@ fn find_dir_entry() {
     assert!(!dir_entry.attributes.is_system());
     assert!(!dir_entry.attributes.is_volume());
 
-    let r = volume_mgr.find_directory_entry(root_dir, "README.TXS");
+    let r = volume_mgr
+        .find_directory_entry(root_dir, "README.TXS")
+        .await;
     let Err(embedded_sdmmc::Error::FileNotFound) = r else {
         panic!("Expected not to find file: {r:?}");
     };

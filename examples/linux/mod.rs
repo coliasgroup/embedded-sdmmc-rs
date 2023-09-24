@@ -2,15 +2,15 @@
 
 use chrono::Timelike;
 use embedded_sdmmc::{Block, BlockCount, BlockDevice, BlockIdx, TimeSource, Timestamp};
-use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
+use std::sync::Mutex;
 
 #[derive(Debug)]
 pub struct LinuxBlockDevice {
-    file: RefCell<File>,
+    file: Mutex<File>,
     print_blocks: bool,
 }
 
@@ -20,7 +20,7 @@ impl LinuxBlockDevice {
         P: AsRef<Path>,
     {
         Ok(LinuxBlockDevice {
-            file: RefCell::new(
+            file: Mutex::new(
                 OpenOptions::new()
                     .read(true)
                     .write(true)
@@ -34,17 +34,18 @@ impl LinuxBlockDevice {
 impl BlockDevice for LinuxBlockDevice {
     type Error = std::io::Error;
 
-    fn read(
+    async fn read(
         &self,
         blocks: &mut [Block],
         start_block_idx: BlockIdx,
         reason: &str,
     ) -> Result<(), Self::Error> {
         self.file
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .seek(SeekFrom::Start(start_block_idx.into_bytes()))?;
         for block in blocks.iter_mut() {
-            self.file.borrow_mut().read_exact(&mut block.contents)?;
+            self.file.lock().unwrap().read_exact(&mut block.contents)?;
             if self.print_blocks {
                 println!(
                     "Read block ({}) {:?}: {:?}",
@@ -55,12 +56,13 @@ impl BlockDevice for LinuxBlockDevice {
         Ok(())
     }
 
-    fn write(&self, blocks: &[Block], start_block_idx: BlockIdx) -> Result<(), Self::Error> {
+    async fn write(&self, blocks: &[Block], start_block_idx: BlockIdx) -> Result<(), Self::Error> {
         self.file
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .seek(SeekFrom::Start(start_block_idx.into_bytes()))?;
         for block in blocks.iter() {
-            self.file.borrow_mut().write_all(&block.contents)?;
+            self.file.lock().unwrap().write_all(&block.contents)?;
             if self.print_blocks {
                 println!("Wrote: {:?}", &block);
             }
@@ -69,7 +71,7 @@ impl BlockDevice for LinuxBlockDevice {
     }
 
     fn num_blocks(&self) -> Result<BlockCount, Self::Error> {
-        let num_blocks = self.file.borrow().metadata().unwrap().len() / 512;
+        let num_blocks = self.file.lock().unwrap().metadata().unwrap().len() / 512;
         Ok(BlockCount(num_blocks as u32))
     }
 }

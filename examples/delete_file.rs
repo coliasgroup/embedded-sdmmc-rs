@@ -1,3 +1,5 @@
+#![feature(async_fn_in_trait)]
+
 //! Delete File Example.
 //!
 //! ```bash
@@ -27,7 +29,8 @@ const FILE_TO_DELETE: &str = "README.TXT";
 
 use embedded_sdmmc::{Error, VolumeIdx, VolumeManager};
 
-fn main() -> Result<(), embedded_sdmmc::Error<std::io::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), embedded_sdmmc::Error<std::io::Error>> {
     env_logger::init();
     let mut args = std::env::args().skip(1);
     let filename = args.next().unwrap_or_else(|| "/dev/mmcblk0".into());
@@ -35,10 +38,12 @@ fn main() -> Result<(), embedded_sdmmc::Error<std::io::Error>> {
     let lbd = LinuxBlockDevice::new(filename, print_blocks).map_err(Error::DeviceError)?;
     let mut volume_mgr: VolumeManager<LinuxBlockDevice, Clock, 8, 8, 4> =
         VolumeManager::new_with_limits(lbd, Clock, 0xAA00_0000);
-    let volume = volume_mgr.open_volume(VolumeIdx(0))?;
+    let volume = volume_mgr.open_volume(VolumeIdx(0)).await?;
     let root_dir = volume_mgr.open_root_dir(volume)?;
     println!("Deleting file {}...", FILE_TO_DELETE);
-    volume_mgr.delete_file_in_dir(root_dir, FILE_TO_DELETE)?;
+    volume_mgr
+        .delete_file_in_dir(root_dir, FILE_TO_DELETE)
+        .await?;
     println!("Deleted!");
     volume_mgr.close_dir(root_dir)?;
     Ok(())

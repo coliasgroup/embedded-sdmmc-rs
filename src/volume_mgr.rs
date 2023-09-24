@@ -1009,7 +1009,7 @@ mod tests {
         type Error = Error;
 
         /// Read one or more blocks, starting at the given block index.
-        fn read(
+        async fn read(
             &self,
             blocks: &mut [Block],
             start_block_idx: BlockIdx,
@@ -1207,7 +1207,11 @@ mod tests {
         }
 
         /// Write one or more blocks, starting at the given block index.
-        fn write(&self, _blocks: &[Block], _start_block_idx: BlockIdx) -> Result<(), Self::Error> {
+        async fn write(
+            &self,
+            _blocks: &[Block],
+            _start_block_idx: BlockIdx,
+        ) -> Result<(), Self::Error> {
             unimplemented!();
         }
 
@@ -1217,12 +1221,12 @@ mod tests {
         }
     }
 
-    #[test]
-    fn partition0() {
+    #[tokio::test]
+    async fn partition0() {
         let mut c: VolumeManager<DummyBlockDevice, Clock, 2, 2> =
             VolumeManager::new_with_limits(DummyBlockDevice, Clock, 0xAA00_0000);
 
-        let v = c.open_volume(VolumeIdx(0)).unwrap();
+        let v = c.open_volume(VolumeIdx(0)).await.unwrap();
         let expected_id = Volume(SearchId(0xAA00_0000));
         assert_eq!(v, expected_id);
         assert_eq!(

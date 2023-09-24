@@ -1,9 +1,11 @@
+#![feature(async_fn_in_trait)]
+
 //! Volume related tests
 
 mod utils;
 
-#[test]
-fn open_all_volumes() {
+#[tokio::test]
+async fn open_all_volumes() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr: embedded_sdmmc::VolumeManager<
@@ -17,10 +19,11 @@ fn open_all_volumes() {
     // Open Volume 0
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
 
     // Fail to Open Volume 0 again
-    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0));
+    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0)).await;
     let Err(embedded_sdmmc::Error::VolumeAlreadyOpen) = r else {
         panic!("Should have failed to open volume {:?}", r);
     };
@@ -30,10 +33,11 @@ fn open_all_volumes() {
     // Open Volume 1
     let fat32_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(1))
+        .await
         .expect("open volume 1");
 
     // Fail to Volume 1 again
-    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(1));
+    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(1)).await;
     let Err(embedded_sdmmc::Error::VolumeAlreadyOpen) = r else {
         panic!("Should have failed to open volume {:?}", r);
     };
@@ -41,10 +45,11 @@ fn open_all_volumes() {
     // Open Volume 0 again
     let fat16_volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
 
     // Open any volume - too many volumes (0 and 1 are open)
-    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0));
+    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0)).await;
     let Err(embedded_sdmmc::Error::TooManyOpenVolumes) = r else {
         panic!("Should have failed to open volume {:?}", r);
     };
@@ -53,13 +58,13 @@ fn open_all_volumes() {
     volume_mgr.close_volume(fat32_volume).expect("close fat32");
 
     // This isn't a valid volume
-    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(2));
+    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(2)).await;
     let Err(embedded_sdmmc::Error::FormatError(_e)) = r else {
         panic!("Should have failed to open volume {:?}", r);
     };
 
     // This isn't a valid volume
-    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(9));
+    let r = volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(9)).await;
     let Err(embedded_sdmmc::Error::NoSuchVolume) = r else {
         panic!("Should have failed to open volume {:?}", r);
     };
@@ -72,14 +77,15 @@ fn open_all_volumes() {
     };
 }
 
-#[test]
-fn close_volume_too_early() {
+#[tokio::test]
+async fn close_volume_too_early() {
     let time_source = utils::make_time_source();
     let disk = utils::make_block_device(utils::DISK_SOURCE).unwrap();
     let mut volume_mgr = embedded_sdmmc::VolumeManager::new(disk, time_source);
 
     let volume = volume_mgr
         .open_volume(embedded_sdmmc::VolumeIdx(0))
+        .await
         .expect("open volume 0");
     let root_dir = volume_mgr.open_root_dir(volume).expect("open root dir");
 
@@ -91,6 +97,7 @@ fn close_volume_too_early() {
 
     let _test_file = volume_mgr
         .open_file_in_dir(root_dir, "64MB.DAT", embedded_sdmmc::Mode::ReadOnly)
+        .await
         .expect("open test file");
 
     volume_mgr.close_dir(root_dir).unwrap();
