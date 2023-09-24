@@ -106,9 +106,3 @@ async fn open_files() {
     volume_mgr.close_dir(root_dir).expect("close dir");
     volume_mgr.close_volume(volume).expect("close volume");
 }
-
-// ****************************************************************************
-//
-// End Of File
-//
-// ****************************************************************************
