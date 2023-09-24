@@ -26,6 +26,7 @@
 //! You cannot enable both the `log` feature and the `defmt-log` feature.
 
 #![cfg_attr(not(test), no_std)]
+#![feature(async_fn_in_trait)]
 #![deny(missing_docs)]
 
 // ****************************************************************************
