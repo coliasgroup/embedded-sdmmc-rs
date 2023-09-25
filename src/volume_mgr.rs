@@ -345,6 +345,25 @@ where
         }
     }
 
+    /// Call a callback function for each directory entry in a directory, with its LFN if it has one.
+    pub async fn iterate_lfn_dir<F>(
+        &mut self,
+        directory: Directory,
+        func: F,
+    ) -> Result<(), Error<D::Error>>
+    where
+        F: FnMut(Option<&str>, &DirEntry),
+    {
+        let directory_idx = self.get_dir_by_id(directory)?;
+        let volume_idx = self.get_volume_by_id(self.open_dirs[directory_idx].volume_id)?;
+        match &self.open_volumes[volume_idx].volume_type {
+            VolumeType::Fat(fat) => {
+                fat.iterate_lfn_dir(&self.block_device, &self.open_dirs[directory_idx], func)
+                    .await
+            }
+        }
+    }
+
     /// Open a file from a DirEntry. This is obtained by calling iterate_dir.
     ///
     /// # Safety

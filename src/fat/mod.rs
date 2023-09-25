@@ -47,11 +47,13 @@ impl BlockCache {
 
 mod bpb;
 mod info;
+mod lfn;
 mod ondiskdirentry;
 mod volume;
 
 pub use bpb::Bpb;
 pub use info::{Fat16Info, Fat32Info, FatSpecificInfo, InfoSector};
+pub use lfn::LfnEntry;
 pub use ondiskdirentry::OnDiskDirEntry;
 pub use volume::{parse_volume, FatVolume, VolumeName};
 
@@ -67,7 +69,9 @@ use crate::{Block, BlockDevice, BlockIdx, Error};
 mod test {
 
     use super::*;
-    use crate::{Attributes, BlockIdx, ClusterId, DirEntry, ShortFileName, Timestamp};
+    use crate::{
+        fat::LfnEntry, Attributes, BlockIdx, ClusterId, DirEntry, ShortFileName, Timestamp,
+    };
 
     fn parse(input: &str) -> Vec<u8> {
         let mut output = Vec::new();
@@ -117,7 +121,7 @@ mod test {
     fn test_dir_entries() {
         #[derive(Debug)]
         enum Expected {
-            Lfn(bool, u8, [char; 13]),
+            Lfn(LfnEntry),
             Short(DirEntry),
         }
         let raw_data = r#"
@@ -149,14 +153,15 @@ mod test {
                 entry_block: BlockIdx(0),
                 entry_offset: 0,
             }),
-            Expected::Lfn(
-                true,
-                1,
-                [
+            Expected::Lfn(LfnEntry {
+                is_start: true,
+                sequence: 1,
+                checksum: 0x47,
+                buffer: [
                     'o', 'v', 'e', 'r', 'l', 'a', 'y', 's', '\u{0000}', '\u{ffff}', '\u{ffff}',
                     '\u{ffff}', '\u{ffff}',
                 ],
-            ),
+            }),
             Expected::Short(DirEntry {
                 name: ShortFileName::create_from_str("OVERLAYS").unwrap(),
                 mtime: Timestamp::from_calendar(2016, 3, 1, 19, 56, 54).unwrap(),
@@ -167,21 +172,23 @@ mod test {
                 entry_block: BlockIdx(0),
                 entry_offset: 0,
             }),
-            Expected::Lfn(
-                true,
-                2,
-                [
+            Expected::Lfn(LfnEntry {
+                is_start: true,
+                sequence: 2,
+                checksum: 0x79,
+                buffer: [
                     '-', 'p', 'l', 'u', 's', '.', 'd', 't', 'b', '\u{0000}', '\u{ffff}',
                     '\u{ffff}', '\u{ffff}',
                 ],
-            ),
-            Expected::Lfn(
-                false,
-                1,
-                [
+            }),
+            Expected::Lfn(LfnEntry {
+                is_start: false,
+                sequence: 1,
+                checksum: 0x79,
+                buffer: [
                     'b', 'c', 'm', '2', '7', '0', '8', '-', 'r', 'p', 'i', '-', 'b',
                 ],
-            ),
+            }),
             Expected::Short(DirEntry {
                 name: ShortFileName::create_from_str("BCM270~1.DTB").unwrap(),
                 mtime: Timestamp::from_calendar(2016, 3, 1, 19, 56, 34).unwrap(),
@@ -192,13 +199,14 @@ mod test {
                 entry_block: BlockIdx(0),
                 entry_offset: 0,
             }),
-            Expected::Lfn(
-                true,
-                1,
-                [
+            Expected::Lfn(LfnEntry {
+                is_start: true,
+                sequence: 1,
+                checksum: 0x12,
+                buffer: [
                     'C', 'O', 'P', 'Y', 'I', 'N', 'G', '.', 'l', 'i', 'n', 'u', 'x',
                 ],
-            ),
+            }),
             Expected::Short(DirEntry {
                 name: ShortFileName::create_from_str("COPYIN~1.LIN").unwrap(),
                 mtime: Timestamp::from_calendar(2016, 3, 1, 19, 56, 30).unwrap(),
@@ -209,21 +217,23 @@ mod test {
                 entry_block: BlockIdx(0),
                 entry_offset: 0,
             }),
-            Expected::Lfn(
-                true,
-                2,
-                [
+            Expected::Lfn(LfnEntry {
+                is_start: true,
+                sequence: 2,
+                checksum: 0x67,
+                buffer: [
                     'c', 'o', 'm', '\u{0}', '\u{ffff}', '\u{ffff}', '\u{ffff}', '\u{ffff}',
                     '\u{ffff}', '\u{ffff}', '\u{ffff}', '\u{ffff}', '\u{ffff}',
                 ],
-            ),
-            Expected::Lfn(
-                false,
-                1,
-                [
+            }),
+            Expected::Lfn(LfnEntry {
+                is_start: false,
+                sequence: 1,
+                checksum: 0x67,
+                buffer: [
                     'L', 'I', 'C', 'E', 'N', 'C', 'E', '.', 'b', 'r', 'o', 'a', 'd',
                 ],
-            ),
+            }),
             Expected::Short(DirEntry {
                 name: ShortFileName::create_from_str("LICENC~1.BRO").unwrap(),
                 mtime: Timestamp::from_calendar(2016, 3, 1, 19, 56, 34).unwrap(),
@@ -234,21 +244,23 @@ mod test {
                 entry_block: BlockIdx(0),
                 entry_offset: 0,
             }),
-            Expected::Lfn(
-                true,
-                2,
-                [
+            Expected::Lfn(LfnEntry {
+                is_start: true,
+                sequence: 2,
+                checksum: 0x19,
+                buffer: [
                     '-', 'b', '.', 'd', 't', 'b', '\u{0000}', '\u{ffff}', '\u{ffff}', '\u{ffff}',
                     '\u{ffff}', '\u{ffff}', '\u{ffff}',
                 ],
-            ),
-            Expected::Lfn(
-                false,
-                1,
-                [
+            }),
+            Expected::Lfn(LfnEntry {
+                is_start: false,
+                sequence: 1,
+                checksum: 0x19,
+                buffer: [
                     'b', 'c', 'm', '2', '7', '0', '9', '-', 'r', 'p', 'i', '-', '2',
                 ],
-            ),
+            }),
             Expected::Short(DirEntry {
                 name: ShortFileName::create_from_str("BCM270~4.DTB").unwrap(),
                 mtime: Timestamp::from_calendar(2016, 3, 1, 19, 56, 36).unwrap(),
@@ -259,33 +271,32 @@ mod test {
                 entry_block: BlockIdx(0),
                 entry_offset: 0,
             }),
-            Expected::Lfn(
-                true,
-                2,
-                [
+            Expected::Lfn(LfnEntry {
+                is_start: true,
+                sequence: 2,
+                checksum: 0x59,
+                buffer: [
                     '.', 'd', 't', 'b', '\u{0000}', '\u{ffff}', '\u{ffff}', '\u{ffff}', '\u{ffff}',
                     '\u{ffff}', '\u{ffff}', '\u{ffff}', '\u{ffff}',
                 ],
-            ),
-            Expected::Lfn(
-                false,
-                1,
-                [
+            }),
+            Expected::Lfn(LfnEntry {
+                is_start: false,
+                sequence: 1,
+                checksum: 0x59,
+                buffer: [
                     'b', 'c', 'm', '2', '7', '0', '8', '-', 'r', 'p', 'i', '-', 'b',
                 ],
-            ),
+            }),
         ];
 
         let data = parse(raw_data);
         for (part, expected) in data.chunks(OnDiskDirEntry::LEN).zip(results.iter()) {
             let on_disk_entry = OnDiskDirEntry::new(part);
             match expected {
-                Expected::Lfn(start, index, contents) if on_disk_entry.is_lfn() => {
-                    let (calc_start, calc_index, calc_contents) =
-                        on_disk_entry.lfn_contents().unwrap();
-                    assert_eq!(*start, calc_start);
-                    assert_eq!(*index, calc_index);
-                    assert_eq!(*contents, calc_contents);
+                Expected::Lfn(expected_lfn_contents) if on_disk_entry.is_lfn() => {
+                    let lfn_contents = on_disk_entry.lfn_contents().unwrap();
+                    assert_eq!(expected_lfn_contents, &lfn_contents);
                 }
                 Expected::Short(expected_entry) if !on_disk_entry.is_lfn() => {
                     let parsed_entry = on_disk_entry.get_entry(FatType::Fat32, BlockIdx(0), 0);

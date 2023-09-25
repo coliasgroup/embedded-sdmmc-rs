@@ -3,8 +3,8 @@
 use crate::{
     debug,
     fat::{
-        Bpb, Fat16Info, Fat32Info, FatSpecificInfo, FatType, InfoSector, OnDiskDirEntry,
-        RESERVED_ENTRIES,
+        lfn::LfnVisitor, Bpb, Fat16Info, Fat32Info, FatSpecificInfo, FatType, InfoSector,
+        OnDiskDirEntry, RESERVED_ENTRIES,
     },
     trace, warn, Attributes, Block, BlockCount, BlockDevice, BlockIdx, ClusterId, DirEntry,
     DirectoryInfo, Error, ShortFileName, TimeSource, VolumeType,
@@ -447,6 +447,53 @@ impl FatVolume {
         F: FnMut(&DirEntry),
         D: BlockDevice,
     {
+        self.iterate_dir_generic(block_device, dir, |_, dir_entry| {
+            if let Some(dir_entry) = dir_entry {
+                func(&dir_entry)
+            }
+        })
+        .await
+    }
+
+    /// Calls callback `func` with every valid entry in the given directory.
+    /// Useful for performing directory listings.
+    pub(crate) async fn iterate_lfn_dir<D, F>(
+        &self,
+        block_device: &D,
+        dir: &DirectoryInfo,
+        mut func: F,
+    ) -> Result<(), Error<D::Error>>
+    where
+        F: FnMut(Option<&str>, &DirEntry),
+        D: BlockDevice,
+    {
+        let mut lfn_visitor = LfnVisitor::default();
+        self.iterate_dir_generic(block_device, dir, |on_disk_entry, dir_entry| {
+            assert_eq!(on_disk_entry.is_lfn(), dir_entry.is_none());
+            match dir_entry {
+                Some(dir_entry) => {
+                    let lfn = lfn_visitor.take(&dir_entry.name);
+                    func(lfn, &dir_entry);
+                }
+                None => {
+                    let lfn_entry = on_disk_entry.lfn_contents().unwrap();
+                    lfn_visitor.visit(&lfn_entry);
+                }
+            }
+        })
+        .await
+    }
+
+    pub(crate) async fn iterate_dir_generic<D, F>(
+        &self,
+        block_device: &D,
+        dir: &DirectoryInfo,
+        mut func: F,
+    ) -> Result<(), Error<D::Error>>
+    where
+        F: FnMut(&OnDiskDirEntry, Option<DirEntry>),
+        D: BlockDevice,
+    {
         match &self.fat_specific_info {
             FatSpecificInfo::Fat16(fat16_info) => {
                 // Root directories on FAT16 have a fixed size, because they use
@@ -480,11 +527,15 @@ impl FatVolume {
                             if dir_entry.is_end() {
                                 // Can quit early
                                 return Ok(());
-                            } else if dir_entry.is_valid() && !dir_entry.is_lfn() {
-                                // Safe, since Block::LEN always fits on a u32
-                                let start = u32::try_from(start).unwrap();
-                                let entry = dir_entry.get_entry(FatType::Fat16, block_idx, start);
-                                func(&entry);
+                            } else if dir_entry.is_valid() {
+                                let entry = if dir_entry.is_lfn() {
+                                    None
+                                } else {
+                                    // Safe, since Block::LEN always fits on a u32
+                                    let start = u32::try_from(start).unwrap();
+                                    Some(dir_entry.get_entry(FatType::Fat16, block_idx, start))
+                                };
+                                func(&dir_entry, entry);
                             }
                         }
                     }
@@ -528,11 +579,15 @@ impl FatVolume {
                             if dir_entry.is_end() {
                                 // Can quit early
                                 return Ok(());
-                            } else if dir_entry.is_valid() && !dir_entry.is_lfn() {
-                                // Safe, since Block::LEN always fits on a u32
-                                let start = u32::try_from(start).unwrap();
-                                let entry = dir_entry.get_entry(FatType::Fat32, block, start);
-                                func(&entry);
+                            } else if dir_entry.is_valid() {
+                                let entry = if dir_entry.is_lfn() {
+                                    None
+                                } else {
+                                    // Safe, since Block::LEN always fits on a u32
+                                    let start = u32::try_from(start).unwrap();
+                                    Some(dir_entry.get_entry(FatType::Fat32, block, start))
+                                };
+                                func(&dir_entry, entry);
                             }
                         }
                     }

@@ -201,6 +201,15 @@ impl ShortFileName {
         }
         Ok(sfn)
     }
+
+    #[allow(missing_docs)]
+    pub fn lfn_checksum(&self) -> u8 {
+        let mut sum = 0u8;
+        for b in &self.contents {
+            sum = sum.rotate_right(1).wrapping_add(*b);
+        }
+        sum
+    }
 }
 
 impl core::fmt::Display for ShortFileName {
