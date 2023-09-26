@@ -39,6 +39,8 @@ extern crate embedded_sdmmc;
 mod linux;
 use linux::*;
 
+use core::ops::ControlFlow;
+
 use embedded_sdmmc::{Directory, VolumeIdx, VolumeManager};
 
 type Error = embedded_sdmmc::Error<std::io::Error>;
@@ -90,6 +92,7 @@ async fn list_dir(
                     children.push(entry.name.clone());
                 }
             }
+            ControlFlow::<()>::Continue(())
         })
         .await?;
     for child_name in children {

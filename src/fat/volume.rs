@@ -11,6 +11,7 @@ use crate::{
 };
 use byteorder::{ByteOrder, LittleEndian};
 use core::convert::TryFrom;
+use core::ops::ControlFlow;
 
 use super::BlockCache;
 
@@ -437,34 +438,33 @@ impl FatVolume {
 
     /// Calls callback `func` with every valid entry in the given directory.
     /// Useful for performing directory listings.
-    pub(crate) async fn iterate_dir<D, F>(
+    pub(crate) async fn iterate_dir<D, F, T>(
         &self,
         block_device: &D,
         dir: &DirectoryInfo,
         mut func: F,
-    ) -> Result<(), Error<D::Error>>
+    ) -> Result<Option<T>, Error<D::Error>>
     where
-        F: FnMut(&DirEntry),
+        F: FnMut(&DirEntry) -> ControlFlow<T>,
         D: BlockDevice,
     {
-        self.iterate_dir_generic(block_device, dir, |_, dir_entry| {
-            if let Some(dir_entry) = dir_entry {
-                func(&dir_entry)
-            }
+        self.iterate_dir_generic(block_device, dir, |_, dir_entry| match dir_entry {
+            Some(dir_entry) => func(&dir_entry),
+            None => ControlFlow::Continue(()),
         })
         .await
     }
 
     /// Calls callback `func` with every valid entry in the given directory.
     /// Useful for performing directory listings.
-    pub(crate) async fn iterate_lfn_dir<D, F>(
+    pub(crate) async fn iterate_lfn_dir<D, F, T>(
         &self,
         block_device: &D,
         dir: &DirectoryInfo,
         mut func: F,
-    ) -> Result<(), Error<D::Error>>
+    ) -> Result<Option<T>, Error<D::Error>>
     where
-        F: FnMut(Option<&str>, &DirEntry),
+        F: FnMut(Option<&str>, &DirEntry) -> ControlFlow<T>,
         D: BlockDevice,
     {
         let mut lfn_visitor = LfnVisitor::default();
@@ -473,25 +473,26 @@ impl FatVolume {
             match dir_entry {
                 Some(dir_entry) => {
                     let lfn = lfn_visitor.take(&dir_entry.name);
-                    func(lfn, &dir_entry);
+                    func(lfn, &dir_entry)
                 }
                 None => {
                     let lfn_entry = on_disk_entry.lfn_contents().unwrap();
                     lfn_visitor.visit(&lfn_entry);
+                    ControlFlow::Continue(())
                 }
             }
         })
         .await
     }
 
-    pub(crate) async fn iterate_dir_generic<D, F>(
+    pub(crate) async fn iterate_dir_generic<D, F, T>(
         &self,
         block_device: &D,
         dir: &DirectoryInfo,
         mut func: F,
-    ) -> Result<(), Error<D::Error>>
+    ) -> Result<Option<T>, Error<D::Error>>
     where
-        F: FnMut(&OnDiskDirEntry, Option<DirEntry>),
+        F: FnMut(&OnDiskDirEntry, Option<DirEntry>) -> ControlFlow<T>,
         D: BlockDevice,
     {
         match &self.fat_specific_info {
@@ -526,7 +527,7 @@ impl FatVolume {
                             let dir_entry = OnDiskDirEntry::new(&block[start..end]);
                             if dir_entry.is_end() {
                                 // Can quit early
-                                return Ok(());
+                                return Ok(None);
                             } else if dir_entry.is_valid() {
                                 let entry = if dir_entry.is_lfn() {
                                     None
@@ -535,7 +536,9 @@ impl FatVolume {
                                     let start = u32::try_from(start).unwrap();
                                     Some(dir_entry.get_entry(FatType::Fat16, block_idx, start))
                                 };
-                                func(&dir_entry, entry);
+                                if let ControlFlow::Break(ret) = func(&dir_entry, entry) {
+                                    return Ok(Some(ret));
+                                };
                             }
                         }
                     }
@@ -554,7 +557,7 @@ impl FatVolume {
                         current_cluster = None;
                     }
                 }
-                Ok(())
+                Ok(None)
             }
             FatSpecificInfo::Fat32(fat32_info) => {
                 // All directories on FAT32 have a cluster chain but the root
@@ -578,7 +581,7 @@ impl FatVolume {
                             let dir_entry = OnDiskDirEntry::new(&blocks[0][start..end]);
                             if dir_entry.is_end() {
                                 // Can quit early
-                                return Ok(());
+                                return Ok(None);
                             } else if dir_entry.is_valid() {
                                 let entry = if dir_entry.is_lfn() {
                                     None
@@ -587,7 +590,9 @@ impl FatVolume {
                                     let start = u32::try_from(start).unwrap();
                                     Some(dir_entry.get_entry(FatType::Fat32, block, start))
                                 };
-                                func(&dir_entry, entry);
+                                if let ControlFlow::Break(ret) = func(&dir_entry, entry) {
+                                    return Ok(Some(ret));
+                                };
                             }
                         }
                     }
@@ -599,7 +604,7 @@ impl FatVolume {
                         _ => None,
                     };
                 }
-                Ok(())
+                Ok(None)
             }
         }
     }

@@ -2,6 +2,8 @@
 
 //! Directory related tests
 
+use core::ops::ControlFlow;
+
 use embedded_sdmmc::ShortFileName;
 
 mod utils;
@@ -86,6 +88,7 @@ async fn fat16_root_directory_listing() {
     volume_mgr
         .iterate_dir(root_dir, |d| {
             listing.push(d.clone());
+            ControlFlow::<()>::Continue(())
         })
         .await
         .expect("iterate directory");
@@ -154,6 +157,7 @@ async fn fat16_sub_directory_listing() {
             }
             count += 1;
             listing.push(d.clone());
+            ControlFlow::<()>::Continue(())
         })
         .await
         .expect("iterate directory");
@@ -218,6 +222,7 @@ async fn fat32_root_directory_listing() {
     volume_mgr
         .iterate_dir(root_dir, |d| {
             listing.push(d.clone());
+            ControlFlow::<()>::Continue(())
         })
         .await
         .expect("iterate directory");

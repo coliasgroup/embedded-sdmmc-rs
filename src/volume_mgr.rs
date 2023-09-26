@@ -4,6 +4,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use core::convert::TryFrom;
+use core::ops::ControlFlow;
 
 use crate::fat::{self, BlockCache, RESERVED_ENTRIES};
 
@@ -327,13 +328,13 @@ where
     }
 
     /// Call a callback function for each directory entry in a directory.
-    pub async fn iterate_dir<F>(
+    pub async fn iterate_dir<F, U>(
         &mut self,
         directory: Directory,
         func: F,
-    ) -> Result<(), Error<D::Error>>
+    ) -> Result<Option<U>, Error<D::Error>>
     where
-        F: FnMut(&DirEntry),
+        F: FnMut(&DirEntry) -> ControlFlow<U>,
     {
         let directory_idx = self.get_dir_by_id(directory)?;
         let volume_idx = self.get_volume_by_id(self.open_dirs[directory_idx].volume_id)?;
@@ -346,13 +347,13 @@ where
     }
 
     /// Call a callback function for each directory entry in a directory, with its LFN if it has one.
-    pub async fn iterate_lfn_dir<F>(
+    pub async fn iterate_lfn_dir<F, U>(
         &mut self,
         directory: Directory,
         func: F,
-    ) -> Result<(), Error<D::Error>>
+    ) -> Result<Option<U>, Error<D::Error>>
     where
-        F: FnMut(Option<&str>, &DirEntry),
+        F: FnMut(Option<&str>, &DirEntry) -> ControlFlow<U>,
     {
         let directory_idx = self.get_dir_by_id(directory)?;
         let volume_idx = self.get_volume_by_id(self.open_dirs[directory_idx].volume_id)?;
