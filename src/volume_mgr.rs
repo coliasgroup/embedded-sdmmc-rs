@@ -327,6 +327,26 @@ where
         }
     }
 
+    #[allow(missing_docs)]
+    pub async fn find_lfn_directory_entry(
+        &mut self,
+        directory: Directory,
+        name: &str,
+    ) -> Result<DirEntry, Error<D::Error>> {
+        let directory_idx = self.get_dir_by_id(directory)?;
+        let volume_idx = self.get_volume_by_id(self.open_dirs[directory_idx].volume_id)?;
+        match &self.open_volumes[volume_idx].volume_type {
+            VolumeType::Fat(fat) => {
+                fat.find_lfn_directory_entry(
+                    &self.block_device,
+                    &self.open_dirs[directory_idx],
+                    &name,
+                )
+                .await
+            }
+        }
+    }
+
     /// Call a callback function for each directory entry in a directory.
     pub async fn iterate_dir<F, U>(
         &mut self,

@@ -6,6 +6,7 @@ use crate::{
         lfn::LfnVisitor, Bpb, Fat16Info, Fat32Info, FatSpecificInfo, FatType, InfoSector,
         OnDiskDirEntry, RESERVED_ENTRIES,
     },
+    filesystem::ToShortFileName,
     trace, warn, Attributes, Block, BlockCount, BlockDevice, BlockIdx, ClusterId, DirEntry,
     DirectoryInfo, Error, ShortFileName, TimeSource, VolumeType,
 };
@@ -728,6 +729,34 @@ impl FatVolume {
             }
         }
         Err(Error::FileNotFound)
+    }
+
+    #[allow(missing_docs)]
+    pub(crate) async fn find_lfn_directory_entry<D>(
+        &self,
+        block_device: &D,
+        dir: &DirectoryInfo,
+        match_name: &str,
+    ) -> Result<DirEntry, Error<D::Error>>
+    where
+        D: BlockDevice,
+    {
+        // TODO should this check LFN _and_ short name?
+        self.iterate_lfn_dir(block_device, dir, |lfn, dir_entry| {
+            if match lfn {
+                Some(name) => name == match_name,
+                None => match_name
+                    .to_short_filename()
+                    .map(|name| name == dir_entry.name)
+                    .unwrap_or(false),
+            } {
+                ControlFlow::Break(dir_entry.clone())
+            } else {
+                ControlFlow::Continue(())
+            }
+        })
+        .await?
+        .ok_or(Error::FileNotFound)
     }
 
     /// Delete an entry from the given directory
