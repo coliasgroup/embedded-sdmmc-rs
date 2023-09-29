@@ -60,9 +60,9 @@ pub use crate::filesystem::{
 
 use filesystem::DirectoryInfo;
 
-mod volume_mgr;
+mod volume;
 #[doc(inline)]
-pub use volume_mgr::Volume;
+pub use volume::Volume;
 
 #[cfg(all(feature = "defmt-log", feature = "log"))]
 compile_error!("Cannot enable both log and defmt-log");
