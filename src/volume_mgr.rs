@@ -16,7 +16,7 @@ use heapless::Vec;
 
 /// A `VolumeManager` wraps a block device and gives access to the FAT-formatted
 /// volumes within it.
-pub struct VolumeManager<D, T, const MAX_DIRS: usize = 4, const MAX_FILES: usize = 4>
+pub struct Volume<D, T, const MAX_DIRS: usize = 4, const MAX_FILES: usize = 4>
 where
     D: BlockDevice,
     T: TimeSource,
@@ -30,7 +30,7 @@ where
     open_files: Vec<FileInfo, MAX_FILES>,
 }
 
-impl<D, T> VolumeManager<D, T, 4, 4>
+impl<D, T> Volume<D, T, 4, 4>
 where
     D: BlockDevice,
     T: TimeSource,
@@ -46,14 +46,14 @@ where
     pub async fn new(
         block_device: D,
         time_source: T,
-    ) -> Result<VolumeManager<D, T, 4, 4>, Error<D::Error>> {
+    ) -> Result<Volume<D, T, 4, 4>, Error<D::Error>> {
         // Pick a random starting point for the IDs that's not zero, because
         // zero doesn't stand out in the logs.
         Self::new_with_limits(block_device, time_source, 5000).await
     }
 }
 
-impl<D, T, const MAX_DIRS: usize, const MAX_FILES: usize> VolumeManager<D, T, MAX_DIRS, MAX_FILES>
+impl<D, T, const MAX_DIRS: usize, const MAX_FILES: usize> Volume<D, T, MAX_DIRS, MAX_FILES>
 where
     D: BlockDevice,
     T: TimeSource,
@@ -70,11 +70,11 @@ where
         block_device: D,
         time_source: T,
         id_offset: u32,
-    ) -> Result<VolumeManager<D, T, MAX_DIRS, MAX_FILES>, Error<D::Error>> {
+    ) -> Result<Volume<D, T, MAX_DIRS, MAX_FILES>, Error<D::Error>> {
         debug!("Creating new embedded-sdmmc::VolumeManager");
         let volume_type =
             fat::parse_volume(&block_device, BlockIdx(0), block_device.num_blocks().await?).await?;
-        Ok(VolumeManager {
+        Ok(Volume {
             block_device,
             time_source,
             id_generator: SearchIdGenerator::new(id_offset),

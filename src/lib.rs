@@ -62,7 +62,7 @@ use filesystem::DirectoryInfo;
 
 mod volume_mgr;
 #[doc(inline)]
-pub use volume_mgr::VolumeManager;
+pub use volume_mgr::Volume;
 
 #[cfg(all(feature = "defmt-log", feature = "log"))]
 compile_error!("Cannot enable both log and defmt-log");
