@@ -1,3 +1,11 @@
+# Embedded FAT
+
+This crate is derived from the
+[embedded-sdmmc](https://github.com/rust-embedded-community/embedded-sdmmc-rs) crate. The
+documentation has not yet been adapted.
+
+Original README:
+
 # Embedded SD/MMC [![crates.io](https://img.shields.io/crates/v/embedded-sdmmc.svg)](https://crates.io/crates/embedded-sdmmc) [![Documentation](https://docs.rs/embedded-sdmmc/badge.svg)](https://docs.rs/embedded-sdmmc)
 
 This crate is intended to allow you to read/write files on a FAT formatted SD
