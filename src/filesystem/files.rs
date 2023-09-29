@@ -1,7 +1,4 @@
-use crate::{
-    filesystem::{ClusterId, DirEntry, SearchId},
-    Volume,
-};
+use crate::filesystem::{ClusterId, DirEntry, SearchId};
 
 /// Represents an open file on disk.
 ///
@@ -29,8 +26,6 @@ pub struct File(pub(crate) SearchId);
 pub(crate) struct FileInfo {
     /// Unique ID for this file
     pub(crate) file_id: File,
-    /// The unique ID for the volume this directory is on
-    pub(crate) volume_id: Volume,
     /// The current cluster, and how many bytes that short-cuts us
     pub(crate) current_cluster: (u32, ClusterId),
     /// How far through the file we've read (in bytes).

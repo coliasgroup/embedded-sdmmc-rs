@@ -46,8 +46,6 @@ pub mod blockdevice;
 pub mod fat;
 pub mod filesystem;
 
-use filesystem::SearchId;
-
 #[doc(inline)]
 pub use crate::blockdevice::{Block, BlockCount, BlockDevice, BlockIdx};
 
@@ -174,23 +172,6 @@ where
     }
 }
 
-/// Represents a partition with a filesystem within it.
-#[cfg_attr(feature = "defmt-log", derive(defmt::Format))]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Volume(SearchId);
-
-/// Internal information about a Volume
-#[cfg_attr(feature = "defmt-log", derive(defmt::Format))]
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct VolumeInfo {
-    /// Search ID for this volume.
-    volume_id: Volume,
-    /// TODO: some kind of index
-    idx: VolumeIdx,
-    /// What kind of volume this is
-    volume_type: VolumeType,
-}
-
 /// This enum holds the data for the various different types of filesystems we
 /// support.
 #[cfg_attr(feature = "defmt-log", derive(defmt::Format))]
@@ -199,26 +180,6 @@ pub enum VolumeType {
     /// FAT16/FAT32 formatted volumes.
     Fat(FatVolume),
 }
-
-/// A `VolumeIdx` is a number which identifies a volume (or partition) on a
-/// disk.
-///
-/// `VolumeIdx(0)` is the first primary partition on an MBR partitioned disk.
-#[cfg_attr(feature = "defmt-log", derive(defmt::Format))]
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub struct VolumeIdx(pub usize);
-
-/// Marker for a FAT32 partition. Sometimes also use for FAT16 formatted
-/// partitions.
-const PARTITION_ID_FAT32_LBA: u8 = 0x0C;
-/// Marker for a FAT16 partition with LBA. Seen on a Raspberry Pi SD card.
-const PARTITION_ID_FAT16_LBA: u8 = 0x0E;
-/// Marker for a FAT16 partition. Seen on a card formatted with the official
-/// SD-Card formatter.
-const PARTITION_ID_FAT16: u8 = 0x06;
-/// Marker for a FAT32 partition. What Macosx disk utility (and also SD-Card formatter?)
-/// use.
-const PARTITION_ID_FAT32_CHS_LBA: u8 = 0x0B;
 
 // ****************************************************************************
 //

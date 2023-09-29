@@ -3,7 +3,6 @@ use core::convert::TryFrom;
 use crate::blockdevice::BlockIdx;
 use crate::fat::{FatType, OnDiskDirEntry};
 use crate::filesystem::{Attributes, ClusterId, SearchId, ShortFileName, Timestamp};
-use crate::Volume;
 
 /// Represents a directory entry, which tells you about
 /// other files and directories.
@@ -54,8 +53,6 @@ pub struct Directory(pub(crate) SearchId);
 pub(crate) struct DirectoryInfo {
     /// Unique ID for this directory.
     pub(crate) directory_id: Directory,
-    /// The unique ID for the volume this directory is on
-    pub(crate) volume_id: Volume,
     /// The starting point of the directory listing.
     pub(crate) cluster: ClusterId,
 }
